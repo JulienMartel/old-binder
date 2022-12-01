@@ -18,8 +18,6 @@ const authorAction = async (
 ) => {
   const { title } = req.body;
 
-  console.log(mixBasePrompt(title));
-
   const baseCompletion = await openai.createCompletion({
     model: "text-davinci-003",
     prompt: mixBasePrompt(title),
