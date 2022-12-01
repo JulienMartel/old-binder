@@ -30,7 +30,7 @@ const generateAction = async (
   console.log(mixBasePrompt(favoriteBooks));
 
   const baseCompletion = await openai.createCompletion({
-    model: "text-davinci-002",
+    model: "text-davinci-003",
     prompt: mixBasePrompt(favoriteBooks),
     temperature: 0.8,
     max_tokens: 300,

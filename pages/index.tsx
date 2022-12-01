@@ -13,11 +13,14 @@ import {
   Box,
   Notification,
   ActionIcon,
+  Tooltip,
+  Loader,
 } from "@mantine/core";
 import { useMediaQuery, useLocalStorage, useHover } from "@mantine/hooks";
 import { useForm } from "@mantine/form";
-import { useState } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 import { IconWand, IconBookUpload, IconTrash } from "@tabler/icons";
+import { Explainer } from "../components/Explainer";
 
 export default function Home() {
   const [favBooks, setFavBooks] = useLocalStorage<string[]>({
@@ -31,24 +34,10 @@ export default function Home() {
 
   const isMobile = useMediaQuery("(max-width: 768px)");
 
-  const form = useForm({
-    initialValues: {
-      title: "",
-      author: "",
-    },
-    validate: {
-      title: (v: string) => (v.length === 0 ? "Title required" : null),
-      author: (v: string) => (v.length === 0 ? "Author required" : null),
-    },
-  });
-
   const add = ({ title, author }: { title: string; author: string }) => {
     const book = `${title} by ${author}`;
 
     if (favBooks.includes(book)) return; // show an error here
-
-    form.reset();
-    setOpened(false);
 
     setFavBooks((prev) => [...prev, book]);
   };
@@ -89,12 +78,12 @@ export default function Home() {
         pos="fixed"
         bottom={0}
         left={0}
-        p="xs"
+        py="xs"
         opacity={1}
         sx={{
           backdropFilter: "blur(2px)",
           backgroundColor: "rgba(0, 0, 0, 0)",
-          zIndex: 10,
+          zIndex: 101,
         }}
       >
         <Container size="xs" w="100%">
@@ -128,16 +117,16 @@ export default function Home() {
         style={{
           position: "fixed",
           zIndex: -1,
-          top: -20,
+          top: 0,
           bottom: 0,
-          left: -20,
+          left: 0,
           right: 0,
           backgroundColor: "#ffffff",
-          opacity: 0.15,
+          opacity: 0.7,
           backgroundImage:
-            "radial-gradient(#000000 2px, transparent 2px), radial-gradient(#000000 2px, #ffffff 2px)",
-          backgroundSize: "80px 80px",
-          backgroundPosition: "0 0, 40px 40px",
+            "radial-gradient(#fa5252 1.2px, transparent 1.2px), radial-gradient(#fa5252 1.2px, #ffffff 1.2px)",
+          backgroundSize: "48px 48px",
+          backgroundPosition: "0 0,24px 24px",
           backgroundAttachment: "fixed",
         }}
       />
@@ -154,6 +143,7 @@ export default function Home() {
         <Flex align="center" my="xl" direction="column">
           <Title size={64}>binder 📚</Title>
           <Text size="xl">find your next favorite book</Text>
+          <Explainer />
         </Flex>
 
         <Space h="xl" />
@@ -219,40 +209,7 @@ export default function Home() {
 
         <Space h="xl" my="xl" />
 
-        <Modal
-          opened={opened}
-          onClose={() => {
-            setOpened(false);
-            form.reset();
-          }}
-          title={
-            <>
-              <Text>Add a book that you love</Text>
-              <Text size="xs" c="dimmed">
-                Make sure the information provided is accurate, and properly
-                capitalized.
-              </Text>
-            </>
-          }
-          withCloseButton={false}
-          centered
-        >
-          <form onSubmit={form.onSubmit(add)}>
-            <TextInput label="Title" {...form.getInputProps("title")} />
-
-            <TextInput
-              mt="xs"
-              label="Author"
-              {...form.getInputProps("author")}
-            />
-
-            <Group position="right" my="md">
-              <Button type="submit" color="red" variant="light">
-                Add ❤
-              </Button>
-            </Group>
-          </form>
-        </Modal>
+        <AddBook opened={opened} setOpened={setOpened} add={add} />
       </Container>
     </>
   );
@@ -294,5 +251,109 @@ const Book = ({
         </ActionIcon>
       </Flex>
     </Paper>
+  );
+};
+
+const AddBook = ({
+  opened,
+  setOpened,
+  add,
+}: {
+  opened: boolean;
+  setOpened: Dispatch<SetStateAction<boolean>>;
+  add: ({ title, author }: { title: string; author: string }) => void;
+}) => {
+  const form = useForm({
+    initialValues: {
+      title: "",
+      author: "",
+    },
+    validate: {
+      title: (v: string) => (v.length === 0 ? "Title required" : null),
+      author: (v: string) => (v.length === 0 ? "Author required" : null),
+    },
+  });
+
+  const onSubmit = ({ title, author }: { title: string; author: string }) => {
+    add({ title, author });
+    form.reset();
+    setOpened(false);
+  };
+
+  const [isLoading, setIsLoading] = useState(false);
+
+  const getAuthor = async () => {
+    setIsLoading(true);
+
+    const response = await fetch("/api/author", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title: form.values.title }),
+    });
+
+    const data = await response.json();
+    const { author } = data;
+
+    form.setFieldValue("author", author);
+    setIsLoading(false);
+  };
+
+  return (
+    <Modal
+      size="lg"
+      opened={opened}
+      onClose={() => {
+        setOpened(false);
+        form.reset();
+      }}
+      title={
+        <>
+          <Text size="lg">Add a book that you love</Text>
+          <Text size="sm" c="dimmed">
+            Ensure the information provided is accurate, and properly
+            capitalized.
+          </Text>
+        </>
+      }
+      withCloseButton={false}
+      centered
+    >
+      <form onSubmit={form.onSubmit(onSubmit)}>
+        <TextInput
+          size="lg"
+          label="Full title"
+          {...form.getInputProps("title")}
+        />
+
+        <TextInput
+          size="lg"
+          mt="xs"
+          label="Author"
+          rightSection={
+            isLoading ? (
+              <Loader size="sm" mr="md" />
+            ) : (
+              form.values.author.trim().length === 0 &&
+              form.values.title.length > 0 && (
+                <Tooltip label="Auto-complete">
+                  <ActionIcon onClick={getAuthor} mr="md">
+                    <IconWand size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              )
+            )
+          }
+          {...form.getInputProps("author")}
+        />
+
+        <Group position="right" my="md">
+          <Button size="lg" type="submit" color="red" variant="light">
+            Add ❤
+          </Button>
+        </Group>
+      </form>
+    </Modal>
   );
 };
